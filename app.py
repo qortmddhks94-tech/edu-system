@@ -171,7 +171,13 @@ def init_db():
                     )
                 """)
     conn.commit()
-
+    # ------------------------------
+    # 기존 students 테이블에 컬럼 추가 (없으면 생성)
+    # ------------------------------
+    try:
+        cur.execute("ALTER TABLE students ADD COLUMN degree_program TEXT;")
+    except:
+        pass
 
 init_db()
 
