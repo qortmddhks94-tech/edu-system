@@ -203,8 +203,11 @@ if menu_type == "관리자용(입력)":
         phone = st.text_input("휴대폰")
 
         if st.button("학생 등록"):
-            cur.execute("INSERT OR REPLACE INTO students VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        (student_id, name, admission_year, degree_program, major, email, phone))
+            cur.execute("""
+                INSERT OR REPLACE INTO students
+                (student_id, name, admission_year, degree_program, major, email, phone)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (student_id, name, admission_year, degree_program, major, email, phone))
             conn.commit()
             st.success(f"{name} 학생이 등록되었습니다.")
 
@@ -316,22 +319,44 @@ elif menu_type == "조회":
     # ------------------------------
     # 학생 조회
     # ------------------------------
-    if menu == "학생 조회":
-        st.subheader("전체 학생 조회")
-        df_students = pd.read_sql("SELECT * FROM students", conn)
+    elif menu == "학생 조회":
+    st.subheader("전체 학생 조회")
+    df_students = pd.read_sql("SELECT * FROM students", conn)
 
-        if df_students.empty:
-            st.info("등록된 학생이 없습니다.")
-        else:
-            for _, row in df_students.iterrows():
-                cols = st.columns([2, 2, 2, 1])
-                cols[0].write(row["student_id"])
-                cols[1].write(row["name"])
-                cols[2].write(row["major"])
-                if cols[3].button("상세 조회", key=f"student_{row['student_id']}"):
-                    with st.modal(f"학생 상세 정보 - {row['name']}"):
-                        st.write(pd.DataFrame(row).T)
+    if df_students.empty:
+        st.info("등록된 학생이 없습니다.")
+    else:
+        # 필터링 UI
+        with st.expander("🔍 검색/필터 옵션", expanded=True):
+            col1, col2, col3, col4 = st.columns(4)
+            search_name = col1.text_input("이름 검색")
+            years = ["전체"] + sorted(df_students["admission_year"].dropna().unique().tolist())
+            filter_year = col2.selectbox("입학년도", years)
+            degrees = ["전체"] + df_students["degree_program"].dropna().unique().tolist()
+            filter_degree = col3.selectbox("학위과정", degrees)
+            majors = ["전체"] + df_students["major"].dropna().unique().tolist()
+            filter_major = col4.selectbox("전공", majors)
 
+        # 필터 적용
+        if search_name:
+            df_students = df_students[df_students["name"].str.contains(search_name, case=False, na=False)]
+        if filter_year != "전체":
+            df_students = df_students[df_students["admission_year"] == filter_year]
+        if filter_degree != "전체":
+            df_students = df_students[df_students["degree_program"] == filter_degree]
+        if filter_major != "전체":
+            df_students = df_students[df_students["major"] == filter_major]
+
+        # 요약 데이터 표시
+        df_summary = df_students[["student_id", "name", "degree_program", "major"]]
+        st.dataframe(df_summary)
+
+        # 상세 조회 기능
+        selected_id = st.selectbox("상세조회할 학생 선택 (학번)", ["선택 안 함"] + df_summary["student_id"].tolist())
+        if selected_id != "선택 안 함":
+            detail = df_students[df_students["student_id"] == selected_id]
+            st.write("### 📌 상세 학생 정보")
+            st.dataframe(detail)
     # ------------------------------
     # 교과과정 조회
     # ------------------------------
